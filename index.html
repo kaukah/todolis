@@ -295,13 +295,13 @@
     <script>
         // Firebase configuration
         const firebaseConfig = {
-  apiKey: "AIzaSyCB1dXIGHGQhgqrTgJOaEqP6ZNdNn-1inE",
-  authDomain: "todolist-endro.firebaseapp.com",
-  databaseURL: "https://todolist-endro-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "todolist-endro",
-  storageBucket: "todolist-endro.firebasestorage.app",
-  messagingSenderId: "767659324425",
-  appId: "1:767659324425:web:99b02d888bf22996f934d8"
+            apiKey: "AIzaSyCB1dXIGHGQhgqrTgJOaEqP6ZNdNn-1inE",
+            authDomain: "todolist-endro.firebaseapp.com",
+            databaseURL: "https://todolist-endro-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "todolist-endro",
+            storageBucket: "todolist-endro.firebasestorage.app",
+            messagingSenderId: "767659324425",
+            appId: "1:767659324425:web:99b02d888bf22996f934d8"
         };
 
         // Initialize Firebase
@@ -541,18 +541,51 @@
                 const targetTaskData = tasks.find(t => t.id === targetTaskId);
                 
                 if (targetTaskData && draggedTaskData.id !== targetTaskData.id) {
-                    // Swap positions
-                    const draggedOrder = draggedTaskData.order;
-                    const targetOrder = targetTaskData.order;
+                    // Get all time blocks
+                    const allTimeBlocks = Array.from(document.querySelectorAll('.time-block'));
                     
-                    draggedTaskData.order = targetOrder;
-                    targetTaskData.order = draggedOrder;
+                    // Get the dragged and target time blocks
+                    const draggedTimeBlock = document.querySelector(`[data-time="${draggedTaskData.id}"]`);
+                    const targetTimeBlock = document.querySelector(`[data-time="${targetTaskData.id}"]`);
                     
-                    // Reorder tasks array
-                    tasks.sort((a, b) => a.order - b.order);
+                    // Get the positions of the time blocks
+                    const draggedIndex = allTimeBlocks.indexOf(draggedTimeBlock);
+                    const targetIndex = allTimeBlocks.indexOf(targetTimeBlock);
                     
-                    // Re-render tasks
-                    renderTasks();
+                    // Move the dragged time block to the target position
+                    if (draggedIndex < targetIndex) {
+                        // Moving down
+                        targetTimeBlock.parentNode.insertBefore(draggedTimeBlock, targetTimeBlock.nextSibling);
+                    } else {
+                        // Moving up
+                        targetTimeBlock.parentNode.insertBefore(draggedTimeBlock, targetTimeBlock);
+                    }
+                    
+                    // Rebuild tasks array based on DOM order
+                    const newTasks = [];
+                    const reorderedBlocks = Array.from(document.querySelectorAll('.time-block'));
+                    
+                    reorderedBlocks.forEach((block, index) => {
+                        const taskId = block.dataset.time;
+                        const existingTask = tasks.find(t => t.id === taskId);
+                        if (existingTask) {
+                            existingTask.order = index;
+                            newTasks.push(existingTask);
+                        }
+                    });
+                    
+                    // Add any new tasks that weren't in the reordered list
+                    tasks.forEach(task => {
+                        if (!newTasks.find(t => t.id === task.id)) {
+                            task.order = newTasks.length;
+                            newTasks.push(task);
+                        }
+                    });
+                    
+                    // Update tasks array
+                    tasks = newTasks;
+                    
+                    // Save to Firebase
                     saveTasksToFirebase();
                 }
             }
@@ -580,6 +613,9 @@
                 task.classList.remove('completed');
             });
             
+            // Sort tasks by order
+            tasks.sort((a, b) => a.order - b.order);
+            
             // Render tasks
             tasks.forEach(task => {
                 const taskElement = document.getElementById(task.id);
@@ -602,8 +638,18 @@
         // Save tasks to Firebase
         function saveTasksToFirebase() {
             showSyncing();
-            tasksRef.set(tasks)
+            
+            // Create a clean copy of tasks for saving
+            const tasksToSave = tasks.map(task => ({
+                id: task.id,
+                title: task.title,
+                completed: task.completed,
+                order: task.order
+            }));
+            
+            tasksRef.set(tasksToSave)
                 .then(() => {
+                    console.log('Tasks saved successfully');
                     hideSyncing();
                 })
                 .catch((error) => {
@@ -619,7 +665,8 @@
                 .then((snapshot) => {
                     const data = snapshot.val();
                     if (data) {
-                        tasks = data;
+                        // Convert object to array
+                        tasks = Object.values(data);
                     } else {
                         tasks = [];
                     }
@@ -636,7 +683,8 @@
         tasksRef.on('value', (snapshot) => {
             const data = snapshot.val();
             if (data) {
-                tasks = data;
+                // Convert object to array
+                tasks = Object.values(data);
                 renderTasks();
             }
         });
