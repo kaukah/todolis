@@ -161,19 +161,14 @@
             min-height: 36px;
             position: relative;
             z-index: 2;
-            cursor: move;
         }
 
         .task:hover {
             transform: translateY(-1px);
         }
 
-        .task.dragging {
-            opacity: 0.5;
-        }
-
-        .task.drag-over {
-            background-color: rgba(59, 130, 246, 0.2);
+        .task.selected {
+            background-color: rgba(59, 130, 246, 0.1);
         }
 
         .task-checkbox {
@@ -311,6 +306,7 @@
 
         // Inisialisasi variabel
         let tasks = [];
+        let selectedInput = null;
         const taskContainer = document.getElementById('task-container');
         const progressBg = document.getElementById('progress-bg');
         const clearBtn = document.getElementById('clear-btn');
@@ -340,7 +336,7 @@
                     timeBlock.innerHTML = `
                         <div class="time-bg"></div>
                         <div class="time-label">${timeLabel}</div>
-                        <div class="task" id="${timeId}" draggable="true">
+                        <div class="task" id="${timeId}">
                             <input type="checkbox" class="task-checkbox">
                             <div class="task-content">
                                 <input type="text" class="task-input" placeholder="Tulis tugas di sini...">
@@ -354,13 +350,6 @@
                     const task = timeBlock.querySelector('.task');
                     const checkbox = task.querySelector('.task-checkbox');
                     const input = task.querySelector('.task-input');
-                    
-                    // Drag and drop - hanya pada elemen task
-                    task.addEventListener('dragstart', handleDragStart);
-                    task.addEventListener('dragover', handleDragOver);
-                    task.addEventListener('dragleave', handleDragLeave);
-                    task.addEventListener('drop', handleDrop);
-                    task.addEventListener('dragend', handleDragEnd);
                     
                     // Checkbox event
                     checkbox.addEventListener('change', function() {
@@ -412,6 +401,15 @@
                         saveTasksToFirebase();
                     });
                     
+                    // Focus event to track selected input
+                    input.addEventListener('focus', function() {
+                        // Remove previous selection
+                        document.querySelectorAll('.task.selected').forEach(t => t.classList.remove('selected'));
+                        // Add selection to current task
+                        task.classList.add('selected');
+                        selectedInput = this;
+                    });
+                    
                     // Enter key to move to next task
                     input.addEventListener('keydown', function(e) {
                         if (e.key === 'Enter') {
@@ -427,7 +425,7 @@
                         }
                     });
                     
-                    // Paste multi-line
+                    // Paste multi-line - improved to paste from selected position
                     input.addEventListener('paste', function(e) {
                         const pasteText = (e.clipboardData || window.clipboardData).getData('text');
                         if (!pasteText.includes('\n')) return;
@@ -436,32 +434,19 @@
                         const lines = pasteText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
                         
                         if (lines.length > 0) {
-                            this.value = lines[0];
+                            // Get all inputs
+                            const allInputs = Array.from(document.querySelectorAll('.task-input'));
+                            const currentIndex = allInputs.indexOf(this);
                             
-                            // Find the next empty time blocks
-                            const emptyBlocks = Array.from(document.querySelectorAll('.task-input'))
-                                .filter(inp => !inp.value && inp !== this)
-                                .slice(0, lines.length - 1);
-                            
-                            emptyBlocks.forEach((inp, index) => {
-                                if (index < lines.length - 1) {
-                                    inp.value = lines[index + 1];
-                                    const taskId = inp.closest('.time-block').dataset.time;
-                                    let taskData = tasks.find(t => t.id === taskId);
+                            // Paste starting from current position
+                            lines.forEach((line, index) => {
+                                const targetIndex = currentIndex + index;
+                                if (targetIndex < allInputs.length) {
+                                    allInputs[targetIndex].value = line;
                                     
-                                    if (!taskData) {
-                                        taskData = {
-                                            id: taskId,
-                                            title: inp.value,
-                                            completed: false,
-                                            order: tasks.length
-                                        };
-                                        tasks.push(taskData);
-                                    } else {
-                                        taskData.title = inp.value;
-                                    }
-                                    
-                                    saveTasksToFirebase();
+                                    // Trigger input event to save to Firebase
+                                    const inputEvent = new Event('input', { bubbles: true });
+                                    allInputs[targetIndex].dispatchEvent(inputEvent);
                                 }
                             });
                         }
@@ -500,103 +485,6 @@
                     // Time is current
                     block.classList.add('time-current');
                 }
-            });
-        }
-        
-        // Drag and drop functions
-        let draggedElement = null;
-        let draggedTaskData = null;
-        
-        function handleDragStart(e) {
-            draggedElement = this;
-            const taskId = this.closest('.time-block').dataset.time;
-            draggedTaskData = tasks.find(t => t.id === taskId);
-            this.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-        }
-        
-        function handleDragOver(e) {
-            if (e.preventDefault) {
-                e.preventDefault();
-            }
-            
-            this.classList.add('drag-over');
-            e.dataTransfer.dropEffect = 'move';
-            return false;
-        }
-        
-        function handleDragLeave(e) {
-            this.classList.remove('drag-over');
-        }
-        
-        function handleDrop(e) {
-            if (e.stopPropagation) {
-                e.stopPropagation();
-            }
-            
-            this.classList.remove('drag-over');
-            
-            if (draggedTaskData) {
-                const targetTaskId = this.closest('.time-block').dataset.time;
-                const targetTaskData = tasks.find(t => t.id === targetTaskId);
-                
-                if (targetTaskData && draggedTaskData.id !== targetTaskData.id) {
-                    // Get all time blocks
-                    const allTimeBlocks = Array.from(document.querySelectorAll('.time-block'));
-                    
-                    // Get the dragged and target time blocks
-                    const draggedTimeBlock = document.querySelector(`[data-time="${draggedTaskData.id}"]`);
-                    const targetTimeBlock = document.querySelector(`[data-time="${targetTaskData.id}"]`);
-                    
-                    // Get the positions of the time blocks
-                    const draggedIndex = allTimeBlocks.indexOf(draggedTimeBlock);
-                    const targetIndex = allTimeBlocks.indexOf(targetTimeBlock);
-                    
-                    // Move the dragged time block to the target position
-                    if (draggedIndex < targetIndex) {
-                        // Moving down
-                        targetTimeBlock.parentNode.insertBefore(draggedTimeBlock, targetTimeBlock.nextSibling);
-                    } else {
-                        // Moving up
-                        targetTimeBlock.parentNode.insertBefore(draggedTimeBlock, targetTimeBlock);
-                    }
-                    
-                    // Rebuild tasks array based on DOM order
-                    const newTasks = [];
-                    const reorderedBlocks = Array.from(document.querySelectorAll('.time-block'));
-                    
-                    reorderedBlocks.forEach((block, index) => {
-                        const taskId = block.dataset.time;
-                        const existingTask = tasks.find(t => t.id === taskId);
-                        if (existingTask) {
-                            existingTask.order = index;
-                            newTasks.push(existingTask);
-                        }
-                    });
-                    
-                    // Add any new tasks that weren't in the reordered list
-                    tasks.forEach(task => {
-                        if (!newTasks.find(t => t.id === task.id)) {
-                            task.order = newTasks.length;
-                            newTasks.push(task);
-                        }
-                    });
-                    
-                    // Update tasks array
-                    tasks = newTasks;
-                    
-                    // Save to Firebase
-                    saveTasksToFirebase();
-                }
-            }
-            
-            return false;
-        }
-        
-        function handleDragEnd(e) {
-            this.classList.remove('dragging');
-            document.querySelectorAll('.drag-over').forEach(el => {
-                el.classList.remove('drag-over');
             });
         }
         
