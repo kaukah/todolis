@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Block To-Do List</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: #000;
+            color: #f8fafc;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 15px;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+        .title-container {
+            position: relative;
+            flex-grow: 1;
+            height: 30px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #f8fafc;
+            position: relative;
+            z-index: 2;
+            padding-left: 10px;
+        }
+
+        .progress-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background-color: #3b82f6;
+            z-index: 1;
+            transition: width 0.3s ease;
+        }
+
+        .time-display {
+            font-size: 18px;
+            font-weight: 700;
+            color: #f8fafc;
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+            margin-left: 15px;
+        }
+
+        .time-display .blink {
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        .clear-btn {
+            background: #dc2626;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: background 0.2s;
+        }
+
+        .clear-btn:hover {
+            background: #b91c1c;
+        }
+
+        .task-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding-right: 10px;
+            scrollbar-width: thin;
+            scrollbar-color: #333 #000;
+            position: relative;
+        }
+
+        .task-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .task-container::-webkit-scrollbar-track {
+            background: #000;
+            border-radius: 3px;
+        }
+
+        .task-container::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 3px;
+        }
+
+        .time-block {
+            display: flex;
+            margin-bottom: 2px;
+            position: relative;
+        }
+
+        .time-label {
+            width: 70px;
+            font-size: 16px;
+            color: #94a3b8;
+            padding-top: 8px;
+            flex-shrink: 0;
+            position: relative;
+            z-index: 2;
+            user-select: none;
+        }
+
+        .time-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .task {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            transition: all 0.2s ease;
+            min-height: 36px;
+            position: relative;
+            z-index: 2;
+            cursor: move;
+        }
+
+        .task:hover {
+            transform: translateY(-1px);
+        }
+
+        .task.dragging {
+            opacity: 0.5;
+        }
+
+        .task.drag-over {
+            background-color: rgba(59, 130, 246, 0.2);
+        }
+
+        .task-checkbox {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        .task-content {
+            flex-grow: 1;
+        }
+
+        .task-input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            font-size: 16px;
+            font-weight: 500;
+            outline: none;
+            color: #f8fafc;
+        }
+
+        .task-input::placeholder {
+            color: #64748b;
+        }
+
+        .task.completed .task-input {
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+
+        /* Time-based background */
+        .time-past .time-bg {
+            background-color: #000;
+        }
+        
+        .time-future .time-bg {
+            background-color: #10b981; /* Hijau lebih terang */
+        }
+        
+        .time-current .time-bg {
+            background-color: #34d399; /* Hijau paling terang untuk waktu sekarang */
+        }
+
+        /* Confetti styles */
+        #confetti-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .storage-info {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            font-size: 10px;
+            color: #64748b;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .sync-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #10b981;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="confetti-canvas"></canvas>
+    
+    <div class="container">
+        <div class="header">
+            <div class="title-container">
+                <div class="progress-bg" id="progress-bg"></div>
+                <h1 class="title" id="title">Todolist 0 Selesai / 0 Tugas</h1>
+            </div>
+            <div class="time-display">
+                <span class="hours">00</span>
+                <span class="blink">:</span>
+                <span class="minutes">00</span>
+            </div>
+            <button class="clear-btn" id="clear-btn">
+                <i class="fas fa-trash"></i> Clear
+            </button>
+        </div>
+
+        <div class="task-container" id="task-container">
+            <!-- Time blocks will be generated here -->
+        </div>
+    </div>
+
+    <div class="storage-info">
+        <div class="sync-status" id="sync-status"></div>
+        <span id="storage-type">🔥 Firebase Cloud</span>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+  apiKey: "AIzaSyCB1dXIGHGQhgqrTgJOaEqP6ZNdNn-1inE",
+  authDomain: "todolist-endro.firebaseapp.com",
+  databaseURL: "https://todolist-endro-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "todolist-endro",
+  storageBucket: "todolist-endro.firebasestorage.app",
+  messagingSenderId: "767659324425",
+  appId: "1:767659324425:web:99b02d888bf22996f934d8"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const tasksRef = database.ref('tasks');
+
+        // Inisialisasi variabel
+        let tasks = [];
+        const taskContainer = document.getElementById('task-container');
+        const progressBg = document.getElementById('progress-bg');
+        const clearBtn = document.getElementById('clear-btn');
+        const title = document.getElementById('title');
+        const syncStatus = document.getElementById('sync-status');
+        
+        // Generate time blocks (08:00 to 21:00 with 30-minute intervals)
+        function generateTimeBlocks() {
+            taskContainer.innerHTML = '';
+            
+            // Start from 8 (08:00) to 21 (21:00)
+            for (let hour = 8; hour <= 21; hour++) {
+                for (let minute = 0; minute < 60; minute += 30) {
+                    // Skip if hour is 21 and minute is 30 (since we end at 21:00)
+                    if (hour === 21 && minute === 30) continue;
+                    
+                    // Format 24-hour without AM/PM
+                    const timeLabel = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                    const timeId = `time-${hour}-${minute}`;
+                    
+                    const timeBlock = document.createElement('div');
+                    timeBlock.className = 'time-block';
+                    timeBlock.dataset.time = timeId;
+                    timeBlock.dataset.hour = hour;
+                    timeBlock.dataset.minute = minute;
+                    
+                    timeBlock.innerHTML = `
+                        <div class="time-bg"></div>
+                        <div class="time-label">${timeLabel}</div>
+                        <div class="task" id="${timeId}" draggable="true">
+                            <input type="checkbox" class="task-checkbox">
+                            <div class="task-content">
+                                <input type="text" class="task-input" placeholder="Tulis tugas di sini...">
+                            </div>
+                        </div>
+                    `;
+                    
+                    taskContainer.appendChild(timeBlock);
+                    
+                    // Add event listeners
+                    const task = timeBlock.querySelector('.task');
+                    const checkbox = task.querySelector('.task-checkbox');
+                    const input = task.querySelector('.task-input');
+                    
+                    // Drag and drop - hanya pada elemen task
+                    task.addEventListener('dragstart', handleDragStart);
+                    task.addEventListener('dragover', handleDragOver);
+                    task.addEventListener('dragleave', handleDragLeave);
+                    task.addEventListener('drop', handleDrop);
+                    task.addEventListener('dragend', handleDragEnd);
+                    
+                    // Checkbox event
+                    checkbox.addEventListener('change', function() {
+                        const taskId = this.closest('.time-block').dataset.time;
+                        let taskData = tasks.find(t => t.id === taskId);
+                        
+                        if (!taskData) {
+                            taskData = {
+                                id: taskId,
+                                title: input.value,
+                                completed: false,
+                                order: tasks.length
+                            };
+                            tasks.push(taskData);
+                        }
+                        
+                        taskData.completed = this.checked;
+                        task.classList.toggle('completed');
+                        saveTasksToFirebase();
+                        updateStats();
+                        
+                        // Confetti animation when task is completed
+                        if (this.checked) {
+                            confetti({
+                                particleCount: 100,
+                                spread: 70,
+                                origin: { y: 0.6 }
+                            });
+                        }
+                    });
+                    
+                    // Input event
+                    input.addEventListener('input', function() {
+                        const taskId = this.closest('.time-block').dataset.time;
+                        let taskData = tasks.find(t => t.id === taskId);
+                        
+                        if (!taskData) {
+                            taskData = {
+                                id: taskId,
+                                title: this.value,
+                                completed: checkbox.checked,
+                                order: tasks.length
+                            };
+                            tasks.push(taskData);
+                        } else {
+                            taskData.title = this.value;
+                        }
+                        
+                        saveTasksToFirebase();
+                    });
+                    
+                    // Enter key to move to next task
+                    input.addEventListener('keydown', function(e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            
+                            // Find the next task input
+                            const allInputs = Array.from(document.querySelectorAll('.task-input'));
+                            const currentIndex = allInputs.indexOf(this);
+                            
+                            if (currentIndex < allInputs.length - 1) {
+                                allInputs[currentIndex + 1].focus();
+                            }
+                        }
+                    });
+                    
+                    // Paste multi-line
+                    input.addEventListener('paste', function(e) {
+                        const pasteText = (e.clipboardData || window.clipboardData).getData('text');
+                        if (!pasteText.includes('\n')) return;
+                        
+                        e.preventDefault();
+                        const lines = pasteText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+                        
+                        if (lines.length > 0) {
+                            this.value = lines[0];
+                            
+                            // Find the next empty time blocks
+                            const emptyBlocks = Array.from(document.querySelectorAll('.task-input'))
+                                .filter(inp => !inp.value && inp !== this)
+                                .slice(0, lines.length - 1);
+                            
+                            emptyBlocks.forEach((inp, index) => {
+                                if (index < lines.length - 1) {
+                                    inp.value = lines[index + 1];
+                                    const taskId = inp.closest('.time-block').dataset.time;
+                                    let taskData = tasks.find(t => t.id === taskId);
+                                    
+                                    if (!taskData) {
+                                        taskData = {
+                                            id: taskId,
+                                            title: inp.value,
+                                            completed: false,
+                                            order: tasks.length
+                                        };
+                                        tasks.push(taskData);
+                                    } else {
+                                        taskData.title = inp.value;
+                                    }
+                                    
+                                    saveTasksToFirebase();
+                                }
+                            });
+                        }
+                    });
+                }
+            }
+            
+            // Update time-based backgrounds
+            updateTimeBasedBackgrounds();
+        }
+        
+        // Update time-based backgrounds
+        function updateTimeBasedBackgrounds() {
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+            const currentTimeInMinutes = currentHour * 60 + currentMinute;
+            
+            const timeBlocks = document.querySelectorAll('.time-block');
+            
+            timeBlocks.forEach(block => {
+                const hour = parseInt(block.dataset.hour);
+                const minute = parseInt(block.dataset.minute);
+                const blockTimeInMinutes = hour * 60 + minute;
+                
+                // Remove existing time classes
+                block.classList.remove('time-past', 'time-future', 'time-current');
+                
+                if (blockTimeInMinutes < currentTimeInMinutes) {
+                    // Time is in the past
+                    block.classList.add('time-past');
+                } else if (blockTimeInMinutes > currentTimeInMinutes) {
+                    // Time is in the future
+                    block.classList.add('time-future');
+                } else {
+                    // Time is current
+                    block.classList.add('time-current');
+                }
+            });
+        }
+        
+        // Drag and drop functions
+        let draggedElement = null;
+        let draggedTaskData = null;
+        
+        function handleDragStart(e) {
+            draggedElement = this;
+            const taskId = this.closest('.time-block').dataset.time;
+            draggedTaskData = tasks.find(t => t.id === taskId);
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+        
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            
+            this.classList.add('drag-over');
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+        
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+        
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+            
+            this.classList.remove('drag-over');
+            
+            if (draggedTaskData) {
+                const targetTaskId = this.closest('.time-block').dataset.time;
+                const targetTaskData = tasks.find(t => t.id === targetTaskId);
+                
+                if (targetTaskData && draggedTaskData.id !== targetTaskData.id) {
+                    // Swap positions
+                    const draggedOrder = draggedTaskData.order;
+                    const targetOrder = targetTaskData.order;
+                    
+                    draggedTaskData.order = targetOrder;
+                    targetTaskData.order = draggedOrder;
+                    
+                    // Reorder tasks array
+                    tasks.sort((a, b) => a.order - b.order);
+                    
+                    // Re-render tasks
+                    renderTasks();
+                    saveTasksToFirebase();
+                }
+            }
+            
+            return false;
+        }
+        
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            document.querySelectorAll('.drag-over').forEach(el => {
+                el.classList.remove('drag-over');
+            });
+        }
+        
+        // Render tasks from Firebase data
+        function renderTasks() {
+            // Clear all inputs first
+            document.querySelectorAll('.task-input').forEach(input => {
+                input.value = '';
+            });
+            document.querySelectorAll('.task-checkbox').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            document.querySelectorAll('.task').forEach(task => {
+                task.classList.remove('completed');
+            });
+            
+            // Render tasks
+            tasks.forEach(task => {
+                const taskElement = document.getElementById(task.id);
+                if (taskElement) {
+                    const checkbox = taskElement.querySelector('.task-checkbox');
+                    const input = taskElement.querySelector('.task-input');
+                    
+                    checkbox.checked = task.completed;
+                    input.value = task.title;
+                    
+                    if (task.completed) {
+                        taskElement.classList.add('completed');
+                    }
+                }
+            });
+            
+            updateStats();
+        }
+        
+        // Save tasks to Firebase
+        function saveTasksToFirebase() {
+            showSyncing();
+            tasksRef.set(tasks)
+                .then(() => {
+                    hideSyncing();
+                })
+                .catch((error) => {
+                    console.error('Error saving tasks:', error);
+                    hideSyncing();
+                });
+        }
+        
+        // Load tasks from Firebase
+        function loadTasksFromFirebase() {
+            showSyncing();
+            tasksRef.once('value')
+                .then((snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        tasks = data;
+                    } else {
+                        tasks = [];
+                    }
+                    renderTasks();
+                    hideSyncing();
+                })
+                .catch((error) => {
+                    console.error('Error loading tasks:', error);
+                    hideSyncing();
+                });
+        }
+        
+        // Listen for real-time updates
+        tasksRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                tasks = data;
+                renderTasks();
+            }
+        });
+        
+        // Sync status indicators
+        function showSyncing() {
+            syncStatus.style.backgroundColor = '#f59e0b';
+        }
+        
+        function hideSyncing() {
+            syncStatus.style.backgroundColor = '#10b981';
+        }
+        
+        // Update jam
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            document.querySelector('.hours').textContent = hours;
+            document.querySelector('.minutes').textContent = minutes;
+            
+            // Update time-based backgrounds
+            updateTimeBasedBackgrounds();
+        }
+        
+        // Update statistik
+        function updateStats() {
+            // Filter out completed tasks
+            const activeTasks = tasks.filter(task => !task.completed && task.title.trim() !== '');
+            const completedTasks = tasks.filter(task => task.completed && task.title.trim() !== '');
+            
+            // Update title with stats
+            title.textContent = `Todolist ${completedTasks.length} Selesai / ${activeTasks.length + completedTasks.length} Tugas`;
+            
+            // Update progress bar in title
+            const totalTasks = activeTasks.length + completedTasks.length;
+            const progress = totalTasks > 0 ? (completedTasks.length / totalTasks) * 100 : 0;
+            progressBg.style.width = `${progress}%`;
+        }
+        
+        // Clear completed tasks
+        clearBtn.addEventListener('click', function() {
+            // Remove completed tasks from array
+            tasks = tasks.filter(task => !task.completed);
+            
+            // Clear completed tasks from UI
+            document.querySelectorAll('.task.completed').forEach(task => {
+                const input = task.querySelector('.task-input');
+                input.value = '';
+                task.classList.remove('completed');
+                const checkbox = task.querySelector('.task-checkbox');
+                checkbox.checked = false;
+            });
+            
+            saveTasksToFirebase();
+        });
+        
+        // Ctrl+A feature to toggle all checkboxes
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+                e.preventDefault();
+                
+                const allCheckboxes = document.querySelectorAll('.task-checkbox');
+                const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
+                
+                allCheckboxes.forEach(checkbox => {
+                    checkbox.checked = !allChecked;
+                    const task = checkbox.closest('.task');
+                    task.classList.toggle('completed', !allChecked);
+                    
+                    const taskId = task.closest('.time-block').dataset.time;
+                    let taskData = tasks.find(t => t.id === taskId);
+                    
+                    if (!taskData) {
+                        taskData = {
+                            id: taskId,
+                            title: task.querySelector('.task-input').value,
+                            completed: !allChecked,
+                            order: tasks.length
+                        };
+                        tasks.push(taskData);
+                    } else {
+                        taskData.completed = !allChecked;
+                    }
+                });
+                
+                saveTasksToFirebase();
+                
+                // Show confetti if all tasks are checked
+                if (!allChecked) {
+                    confetti({
+                        particleCount: 200,
+                        spread: 70,
+                        origin: { y: 0.6 }
+                    });
+                }
+            }
+        });
+        
+        // Inisialisasi
+        updateClock();
+        setInterval(updateClock, 60000); // Update every minute
+        generateTimeBlocks();
+        loadTasksFromFirebase();
+    </script>
+</body>
+</html>
